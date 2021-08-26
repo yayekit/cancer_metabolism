@@ -446,7 +446,7 @@ rm(
 
 
 
-
+# Shorter version of the previous dataframe with only 1 row left for each group (good for most of further operations)
 ctrp_cor_short <-
   ctrp_cor %>%
   group_by(group_id) %>%
@@ -476,8 +476,6 @@ library(dplyr)
 #
 metabol_link <-
   "https://smpdb.ca/downloads/smpdb_metabolites.csv.zip"
-#
-# load("C:/Users/yemelianovskyi/Google Drive/Study/ICB/thesisProject/Data/ctrp_cor.RData")
 #
 ### 1.1 ctrp_list ###
 # Acquiring CTRP data from the web.
