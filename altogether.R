@@ -1,4 +1,4 @@
-### 0.1 libraries ###
+### 0.1 load packages ###
 library(BiocManager)
 library(readxl)
 library(unix)
@@ -18,9 +18,9 @@ library(magrittr)
 library(tidyverse)
 library(data.table)
 library(fuzzyjoin)
-library(RcppEigen)
+# library(RcppEigen) This package should probably not be attached before it's actually needed, because its functions may mask base packages functions and cause errors (see) 
 memory.size(max = TRUE) # Windows-speific memory limit
-# rlimit_as(1e14, 1e14) # macOS/Linux specific
+# rlimit_as(1e14, 1e14) # macOS/Linux specific memory limit
 theme_set(theme_bw(base_size = 10))
 options(scipen = 999, digits = 10)
 
@@ -47,11 +47,10 @@ ccle_names_link <-
 # CTRP dataset for dose-response data.
 ctrp_link <-
   "ftp://caftpd.nci.nih.gov/pub/OCG-DCC/CTD2/Broad/CTRPv2.0_2015_ctd2_ExpandedDataset/CTRPv2.0_2015_ctd2_ExpandedDataset.zip"
-# "https://ctd2-data.nci.nih.gov/Public/Broad/CTRPv2.0_2015_ctd2_ExpandedDataset/CTRPv2.0_2015_ctd2_ExpandedDataset.zip"
-#
+# Names for overlapping with CCLE-dataframe.
 gdsc_to_ccle_names_link <-
   "https://www.cancerrxgene.org/gdsc1000/GDSC1000_WebResources//Data/suppData/TableS4E.xlsx"
-#
+# Names for overlapping with CTRP-dataframe.
 gdsc_to_ctrp_names_link <-
   "https://www.cancerrxgene.org/gdsc1000/GDSC1000_WebResources//Data/suppData/TableS4I.xlsx"
 
@@ -69,24 +68,24 @@ gdsc_to_ctrp_names_link <-
 
 
 
-##### 1.1 ctrp_list #####
+### 1.1 ctrp_list ###
 # Acquiring CTRP data from the web.
 tempfile_ctrp <-
   tempfile() # Allocating a temporary file to write the downloaded data to.
-#
+# Downloading the data and writing it to the allocated file.
 download.file(
   ctrp_link,
   tempfile_ctrp,
   mode = "wb"
-) # Downloading the data and writing it to the allocated file.
-#
+)
+# Creating a temporary directory to save downloaded files to.
 tempdir_ctrp <-
-  tempdir() # Creating a temporary directory to save downloaded files to.
-#
+  tempdir()
+# Uncompressing zipped downloaded data.
 unzip(
   tempfile_ctrp,
   exdir = "tempdir_ctrp"
-) # Uncompressing zipped downloaded data.
+)
 # Attaching individual uncompressed files to a list.
 ctrp_names_list <-
   list.files(
@@ -159,7 +158,7 @@ rm(
 
 
 
-##### 1.2 ccle_metabolomics #####
+### 1.2 ccle_metabolomics ###
 # Downloading core metabolomics data for this project.
 #
 ccle_names <-
@@ -196,6 +195,7 @@ ccle_metabolomics <-
   ) %>%
   select(-CCLE_ID.y) %>%
   rename(CCLE_ID = CCLE_ID.x) %>%
+  # In case of repetitive DepMap IDs.
   # distinct(
   #   DepMap_ID,
   #   .keep_all = TRUE
@@ -232,7 +232,7 @@ rm(
 
 
 
-##### 1.3 ctrp_for_cor_long #####
+### 1.3 ctrp_for_cor_long ###
 ctrp_for_cor_long <-
   `tempdir_ctrp/v20.data.curves_post_qc.txt` %>%
   full_join(`tempdir_ctrp/v20.meta.per_experiment.txt`) %>%
@@ -336,7 +336,7 @@ rm(
 
 
 
-##### 2 ctrp_cor #####
+### 2 ctrp_cor ###
 ctrp_for_cor <-
   ctrp_for_cor_long %>%
   drop_na() %>%
@@ -362,9 +362,9 @@ save(
 
 
 
-
+# This package should be detached 
 library(RcppEigen)
-##### 2 ctrp_cor #####
+# Using high-speed "data.table" functions insted of their slower counterparts from "base" and "tidyverse".
 ctrp_cor <-
   setDT(ctrp_for_cor)[, .(
     cor_coef = cor.test(
@@ -479,7 +479,7 @@ metabol_link <-
 #
 # load("C:/Users/yemelianovskyi/Google Drive/Study/ICB/thesisProject/Data/ctrp_cor.RData")
 #
-##### 1.1 ctrp_list #####
+### 1.1 ctrp_list ###
 # Acquiring CTRP data from the web.
 tempfile_metabol <-
   tempfile() # Allocating a temporary file to write the downloaded data to.
@@ -620,7 +620,7 @@ save(
 
 
 
-##### 11 ctrp_metabolites_cor_signif #####
+### 11 ctrp_metabolites_cor_signif ###
 ctrp_metabolites_cor_signif <-
   ctrp_cor %>%
   ungroup() %>%
@@ -649,7 +649,7 @@ save(
 
 
 
-##### 11 ctrp_cor_short_signif #####
+### 11 ctrp_cor_short_signif ###
 ctrp_cor_short_signif <-
   ctrp_cor_short %>%
   ungroup() %>%
@@ -687,7 +687,8 @@ save(
 
 
 
-##### 11 ctrp_metabolites_cor_signif_PDF #####
+### 11 ctrp_metabolites_cor_signif_PDF ###
+# Arranging groups in the dataframe in such a way that groups with biggest
 ctrp_metabolites_cor_signif_PDF <-
   ctrp_metabolites_cor_signif %>%
   group_by(group_id) %>%
@@ -1520,7 +1521,7 @@ volcano_by_tcga_code
 
 
 
-##### 11 summary_logq #####
+### 11 summary_logq ###
 summary_logq <-
   ggplot(
     hyper_both,
@@ -1709,7 +1710,7 @@ save(
 
 
 options(scipen = 0, digits = 5)
-##### 11 p_ctrp_signif_dose_response_by_ccle_primary_site.pdf #####
+### 11 p_ctrp_signif_dose_response_by_ccle_primary_site.pdf ###
 # Flush all the results to one PDF-file
 pdf(
   "Plots/p_ctrp_signif_dose_response_by_ccle_primary_site.pdf",
@@ -1965,7 +1966,7 @@ barplot_tcga
 
 
 
-##### 3 histogram_by_tcga_code #####
+### 3 histogram_by_tcga_code ###
 histogram_by_tcga_code <-
   ctrp_cor_short_signif %>%
   # filter(area_under_curve < 100000) %>%
@@ -2022,7 +2023,7 @@ histogram_by_tcga_code
 
 
 
-##### 11 volcano_by_tcga_code #####
+### 11 volcano_by_tcga_code ###
 volcano_by_tcga_code <-
   ctrp_cor_short_signif %>%
   mutate(
@@ -2127,7 +2128,7 @@ volcano_by_tcga_code
 
 
 
-##### 11 volcano_summary #####
+### 11 volcano_summary ###
 volcano_summary <- ggplot(
   ctrp_cor_short_signif,
   aes(
@@ -2194,7 +2195,7 @@ volcano_summary
 
 
 
-##### 0.1 libraries #####
+### 0.1 libraries ###
 library(tidyverse)
 library(data.table)
 library(readxl)
@@ -2232,7 +2233,7 @@ hypergeom_group_id <-
 
 
 
-##### 11 test_metabolites_base #####
+### 11 test_metabolites_base ###
 test_metabolites_base <-
   ctrp_metabolites_cor_short %>%
   separate_rows(
@@ -2458,7 +2459,7 @@ test_metabolites_heatmap_plot
 
 
 
-##### 11 p_ctrp_signif_dose_response_by_ccle_primary_site.pdf #####
+### 11 p_ctrp_signif_dose_response_by_ccle_primary_site.pdf ###
 # Flush all the results to one PDF-file
 pdf(
   "Plots/p_ctrp_signif_dose_response_by_ccle_primary_site.pdf",
