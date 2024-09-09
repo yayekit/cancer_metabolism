@@ -1,0 +1,260 @@
+source("setup.R")
+
+### 1.1 ctrp_list ###
+# Acquiring CTRP data from the web.
+tempfile_ctrp <-
+  tempfile() # Allocating a temporary file to write the downloaded data to.
+# Downloading the data and writing it to the allocated file.
+download.file(
+  ctrp_link,
+  tempfile_ctrp,
+  mode = "wb"
+)
+# Creating a temporary directory to save downloaded files to.
+tempdir_ctrp <-
+  tempdir()
+# Uncompressing zipped downloaded data.
+unzip(
+  tempfile_ctrp,
+  exdir = "tempdir_ctrp"
+)
+# Attaching individual uncompressed files to a list.
+ctrp_names_list <-
+  list.files(
+    path = "tempdir_ctrp",
+    pattern = "*.txt",
+    full.names = TRUE,
+    recursive = FALSE
+  )
+# Looping over the elements of the list, reading each of the elements as a TAB-delimited dataframe
+ctrp_list <-
+  lapply(ctrp_names_list, function(x) {
+    read_delim(
+      x,
+      "\t",
+      escape_double = FALSE,
+      trim_ws = TRUE,
+      col_names = TRUE
+    )
+  }) %>%
+  purrr::compact() # Using compact() to discard elements of the list of dataframes hat are NULL or that have length zero.
+#
+dir.create(path = "Data/tempdir_ctrp") # Creating a permanent directory to save processed files to.
+#
+ctrp_list <-
+  setNames(
+    object = ctrp_list,
+    ctrp_names_list
+  ) # Provide names to the elements of the list.
+#
+list2env(
+  ctrp_list,
+  globalenv()
+) # From a named list ctrp_list, assign all list components as objects into a pre-existing environment.
+#
+obj <-
+  ls(ctrp_list) # save the elemens of the list to a new object.
+#
+for (i in 1:length(obj)) {
+  # save every element of the list as a separate .RData file. These files could be accessed offline later from the "Data" directory.
+  save(
+    list = (obj[i]),
+    file = paste(
+      "Data/",
+      obj[i],
+      ".RData",
+      sep = ""
+    )
+  )
+}
+# Removing every temporary and/or intermediate file and folder used for data downloading and unpacking.
+rm(
+  tempfile_ctrp,
+  tempdir_ctrp,
+  ctrp_names_list,
+  ctrp_list,
+  obj
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 1.2 ccle_metabolomics ###
+# Downloading core metabolomics data for this project.
+#
+ccle_names <-
+  fread(ccle_names_link) %>%
+  select(
+    CCLE_ID,
+    Name,
+    tcga_code
+  )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ccle_metabolomics <-
+  fread(ccle_metabolites_link) %>%
+  stringdist_join(
+    ccle_names,
+    by = "CCLE_ID",
+    max_dist = 1,
+    method = "lcs",
+    mode = "left",
+    ignore_case = TRUE
+  ) %>%
+  select(-CCLE_ID.y) %>%
+  rename(CCLE_ID = CCLE_ID.x) %>%
+  # In case of repetitive DepMap IDs.
+  # distinct(
+  #   DepMap_ID,
+  #   .keep_all = TRUE
+  # ) %>%
+  select(
+    CCLE_ID,
+    Name,
+    DepMap_ID,
+    tcga_code,
+    everything()
+  ) %>%
+  rename(
+    ccl_name = Name
+  ) %>%
+  drop_na(ccl_name)
+#
+save(
+  ccle_metabolomics,
+  file = "Data/ccle_metabolomics.RData"
+)
+#
+rm(
+  ccle_names,
+  ccle_metabolites_link,
+  ccle_names_link
+)
+
+
+
+
+
+
+
+
+
+
+### 1.3 ctrp_for_cor_long ###
+ctrp_for_cor_long <-
+  `tempdir_ctrp/v20.data.curves_post_qc.txt` %>%
+  full_join(`tempdir_ctrp/v20.meta.per_experiment.txt`) %>%
+  full_join(`tempdir_ctrp/v20.meta.per_compound.txt`) %>%
+  full_join(`tempdir_ctrp/v20.meta.per_cell_line.txt`) %>%
+  select(
+    apparent_ec50_umol,
+    area_under_curve,
+    top_test_conc_umol,
+    cpd_name,
+    master_cpd_id,
+    broad_cpd_id,
+    ccl_name,
+    master_ccl_id,
+    growth_mode,
+    # Pathway.Name,
+    ccle_primary_site,
+    ccle_primary_hist,
+    ccle_hist_subtype_1,
+    gene_symbol_of_protein_target
+    # tcga_code
+  ) %>%
+  drop_na(ccl_name) %>%
+  stringdist_join(
+    ccle_metabolomics,
+    by = "ccl_name",
+    max_dist = 1,
+    method = "lcs",
+    mode = "right",
+    ignore_case = TRUE
+  ) %>%
+  rename(ccl_name = as.factor("ccl_name.y")) %>%
+  select(-c(
+    # ccl_name.y,
+    ccl_name.x,
+    CCLE_ID,
+    DepMap_ID
+  )) %>%
+  pivot_longer(
+    !c(
+      apparent_ec50_umol,
+      area_under_curve,
+      top_test_conc_umol,
+      cpd_name,
+      master_cpd_id,
+      broad_cpd_id,
+      ccl_name,
+      master_ccl_id,
+      growth_mode,
+      # Pathway.Name,
+      ccle_primary_site,
+      ccle_primary_hist,
+      ccle_hist_subtype_1,
+      gene_symbol_of_protein_target,
+      tcga_code
+    ),
+    names_to = "metabolite_name",
+    names_repair = "check_unique",
+    values_to = "metabolite_conc",
+    values_drop_na = FALSE
+  ) %>%
+  group_by(
+    tcga_code,
+    master_cpd_id,
+    metabolite_name
+  ) %>%
+  mutate(
+    group_id = cur_group_id() # Gives a unique numeric identifier for each group
+  ) %>%
+  ungroup()
+#
+save(
+  ctrp_for_cor_long,
+  file = "Data/ctrp_for_cor_long.RData"
+)
+#
+rm(
+  `tempdir_ctrp/v20.data.curves_post_qc.txt`,
+  `tempdir_ctrp/v20.meta.per_experiment.txt`,
+  `tempdir_ctrp/v20.meta.per_compound.txt`,
+  # `tempdir_ctrp/v20.meta.per_cell_line.txt`,
+  `tempdir_ctrp/v20._COLUMNS.txt`,
+  `tempdir_ctrp/v20._README.txt`,
+  `tempdir_ctrp/v20.data.per_cpd_avg.txt`,
+  `tempdir_ctrp/v20.data.per_cpd_post_qc.txt`,
+  `tempdir_ctrp/v20.data.per_cpd_pre_qc.txt`,
+  `tempdir_ctrp/v20.data.per_cpd_well.txt`,
+  `tempdir_ctrp/v20.meta.media_comp.txt`,
+  `tempdir_ctrp/v20.meta.per_assay_plate.txt`,
+  ccle_metabolomics,
+  ctrp_link,
+  i
+)r
