@@ -1,7 +1,8 @@
+# Load required libraries and data
 source("setup.R")
 load("Data/ctrp_for_cor_long.RData")
 
-### 2 ctrp_cor ###
+# Calculate correlations and summarize data
 ctrp_cor <- ctrp_for_cor_long %>%
   group_by(group_id) %>%
   summarise(
@@ -17,7 +18,7 @@ ctrp_cor <- ctrp_for_cor_long %>%
   ) %>%
   ungroup()
 
-# Create and save ctrp_cor_short
+# Filter and adjust p-values
 ctrp_cor_short <- ctrp_cor %>%
   filter(n >= 5) %>%
   mutate(
@@ -25,17 +26,19 @@ ctrp_cor_short <- ctrp_cor %>%
     fdr_spearman = p.adjust(p_value_spearman, method = "fdr")
   )
 
+# Save intermediate results
 save(ctrp_cor_short, file = "Data/ctrp_cor_short.RData")
 
-### 11 ctrp_metabolites_cor_signif ###
+# Identify significant correlations
 ctrp_metabolites_cor_signif <- ctrp_cor_short %>%
   filter(fdr_pearson < 0.05 | fdr_spearman < 0.05)
 
-# Create and save ctrp_cor_short_signif
+# Create final dataset with significant correlations
 ctrp_cor_short_signif <- ctrp_cor_short %>%
   filter(group_id %in% ctrp_metabolites_cor_signif$group_id)
 
+# Save final results
 save(ctrp_cor_short_signif, file = "Data/ctrp_cor_short_signif.RData")
 
-# Clean up
+# Clean up workspace
 rm(list = setdiff(ls(), c("ctrp_cor", "ctrp_cor_short", "ctrp_cor_short_signif")))
